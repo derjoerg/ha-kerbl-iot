@@ -1,0 +1,8 @@
+{
+  "title": "Kerbl IoT",
+  "config": {
+    "abort": {
+      "not_implemented": "Account login will be added in a later development step of this integration."
+    }
+  }
+}

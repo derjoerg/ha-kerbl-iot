@@ -1,0 +1,73 @@
+[project]
+name = "ha-kerbl-iot"
+version = "0.1.0"
+description = "Home Assistant custom integration for Kerbl IoT (SmartCoop and future Kerbl product lines)"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "derjoerg" }]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["custom_components", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "N",    # pep8-naming
+  "D",    # pydocstyle
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear
+  "A",    # flake8-builtins
+  "C4",   # flake8-comprehensions
+  "ANN",  # flake8-annotations
+  "ASYNC", # flake8-async
+  "S",    # flake8-bandit
+  "PTH",  # flake8-use-pathlib
+  "SIM",  # flake8-simplify
+  "TID",  # flake8-tidy-imports
+  "ARG",  # flake8-unused-arguments
+  "PL",   # pylint
+  "PERF", # perflint
+  "RUF",  # ruff-specific rules
+]
+ignore = [
+  "D203",   # conflicts with D211 (no-blank-line-before-class)
+  "D213",   # conflicts with D212 (multi-line-summary-first-line)
+  "ANN401", # Any is sometimes unavoidable at HA framework boundaries
+  "PLR0913", # Home Assistant setup/entity signatures are legitimately wide
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may use asserts, access private members, skip full annotations/docstrings,
+# and request fixtures purely for their side effect (unused-looking arguments).
+"tests/*" = ["S101", "SLF001", "ANN", "D", "PLR2004", "ARG"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components", "custom_components.kerbl_iot"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+plugins = []
+exclude = ["build/", "dist/"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--strict-markers"
+
+[tool.coverage.run]
+source = ["custom_components.kerbl_iot"]

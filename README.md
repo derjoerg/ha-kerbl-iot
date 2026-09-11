@@ -1,0 +1,95 @@
+# Kerbl IoT – Home Assistant Integration
+
+[![CI](https://github.com/derjoerg/ha-kerbl-iot/actions/workflows/ci.yml/badge.svg)](https://github.com/derjoerg/ha-kerbl-iot/actions/workflows/ci.yml)
+[![Validate](https://github.com/derjoerg/ha-kerbl-iot/actions/workflows/validate.yml/badge.svg)](https://github.com/derjoerg/ha-kerbl-iot/actions/workflows/validate.yml)
+[![HACS Custom Repository](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz/)
+
+Custom [Home Assistant](https://www.home-assistant.io/) integration for
+[Kerbl IoT](https://www.kerbl-iot.com/) devices, built on top of the
+[`kerbl-iot`](https://pypi.org/project/kerbl-iot/) Python client.
+
+> **Status: Grundgerüst.** This repository currently only contains the
+> project skeleton (domain, `manifest.json`, packaging, CI, test harness).
+> No entities exist yet – they're added in the next build-out steps. This
+> README is kept as a living document and updated as each step lands.
+
+## Design goals
+
+- **Multiple product lines.** `kerbl-iot` currently only models SmartCoop
+  devices, but the integration is structured so future Kerbl product lines
+  can be added as additional device types without redesigning the domain,
+  config flow, or coordinator.
+- **Multiple accounts.** Each Kerbl account is added as its own config
+  entry; you can add as many Kerbl accounts as you like.
+- **Devices with sub-devices.** A SmartCoop is modelled as one Home
+  Assistant device, with its door, light, feeder, water heater and
+  brightness sensor represented as linked sub-devices (`via_device`).
+- **Push-driven, poll as fallback.** One `DataUpdateCoordinator` per config
+  entry (= per account), fed primarily by the `kerbl-iot` Socket.IO push
+  callbacks; `update_interval` (15–20 minutes) exists only as a
+  self-healing fallback poll, not the primary refresh mechanism.
+- **Core-grade quality bar in a HACS custom repo.** Strict `ruff` + `mypy`,
+  `hassfest` and `hacs/action` validation, and tests with
+  [`pytest-homeassistant-custom-component`](https://pypi.org/project/pytest-homeassistant-custom-component/)
+  plus [`syrupy`](https://pypi.org/project/syrupy/) snapshot tests from the
+  first commit – even though this integration is not (yet) intended for
+  Home Assistant Core.
+
+## Planned entity model (SmartCoop)
+
+| Sub-device      | Entity                                   | Platform         |
+| ---------------- | ----------------------------------------- | ---------------- |
+| SmartCoop (root) | Air temperature                           | `sensor`         |
+| SmartCoop (root) | Errors active (+ active errors attribute) | `binary_sensor`  |
+| SmartCoop (root) | Firmware version                          | device property  |
+| Door              | Door                                      | `cover`          |
+| Light             | Light (on/off)                            | `light`          |
+| Light             | Dim value (0–100)                         | `sensor`         |
+| Feeder            | Trigger feeding                           | `button`         |
+| Feeder            | Feeding active                            | `binary_sensor`  |
+| Water heater      | Water temperature                         | `sensor`         |
+| Water heater      | Water sensor state                        | `binary_sensor`  |
+| Brightness        | Brightness (0–100)                        | `sensor`         |
+
+This table reflects the current plan and will be extended (config flow,
+reauth, coordinator, translations) as later steps are implemented.
+
+## Installation (HACS custom repository)
+
+1. In HACS, open the three-dot menu → **Custom repositories**.
+2. Add `https://github.com/derjoerg/ha-kerbl-iot` with category
+   **Integration**.
+3. Install **Kerbl IoT**, restart Home Assistant, then add the integration
+   via **Settings → Devices & services → Add integration**.
+
+_(Config flow is not implemented yet – see Status above.)_
+
+## Development
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements_test.txt
+
+ruff check .
+ruff format --check .
+mypy custom_components
+pytest
+```
+
+Snapshot tests use `syrupy`; after an intentional behaviour change, refresh
+snapshots with:
+
+```bash
+pytest --snapshot-update
+```
+
+Review the resulting diff under `tests/__snapshots__/` before committing.
+
+## Localization
+
+English and German are supported (`custom_components/kerbl_iot/translations/`).
+
+## License
+
+MIT, see [`LICENSE`](LICENSE).

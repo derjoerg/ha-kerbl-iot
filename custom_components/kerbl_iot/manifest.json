@@ -1,0 +1,14 @@
+{
+  "codeowners": ["@derjoerg"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/derjoerg/ha-kerbl-iot",
+  "domain": "kerbl_iot",
+  "integration_type": "hub",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/derjoerg/ha-kerbl-iot/issues",
+  "loggers": ["kerbl_iot"],
+  "name": "Kerbl IoT",
+  "requirements": ["kerbl-iot==0.1.5"],
+  "version": "0.1.0"
+}

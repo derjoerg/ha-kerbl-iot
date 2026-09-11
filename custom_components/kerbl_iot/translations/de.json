@@ -1,0 +1,8 @@
+{
+  "title": "Kerbl IoT",
+  "config": {
+    "abort": {
+      "not_implemented": "Die Kontoanmeldung wird in einem späteren Entwicklungsschritt dieser Integration ergänzt."
+    }
+  }
+}
