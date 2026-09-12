@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
-from homeassistant.components.light import ColorMode, LightEntity
+from homeassistant.components.light import LightEntity
+from homeassistant.components.light.const import ColorMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -33,7 +34,12 @@ class KerblIotLight(KerblIotEntity, LightEntity):
     """
 
     _attr_color_mode = ColorMode.ONOFF
-    _attr_supported_color_modes: ClassVar[set[ColorMode]] = {ColorMode.ONOFF}
+    # LightEntity declares this as an instance attribute (not a ClassVar), so
+    # it can't be narrowed to ClassVar here without mypy's "Cannot override
+    # instance variable with class variable" error. Nothing ever mutates this
+    # set in place, so sharing one frozen set of values across instances is
+    # safe despite ruff's usual mutable-default suspicion.
+    _attr_supported_color_modes: set[ColorMode] | None = {ColorMode.ONOFF}  # noqa: RUF012
 
     def __init__(
         self, coordinator: KerblIotDataUpdateCoordinator, smart_coop_id: str
