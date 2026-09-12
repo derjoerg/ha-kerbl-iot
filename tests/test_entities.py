@@ -128,9 +128,9 @@ async def test_sub_devices_are_linked_to_the_smart_coop_root_device(
 ) -> None:
     """Door/light/feeder/water heater/brightness are their own devices.
 
-    Each is linked back to the SmartCoop root device via `via_device`, and
-    none of them re-states the SmartCoop's own identity (manufacturer/model/
-    sw_version live on the root device only).
+    Each is linked back to the SmartCoop root device via `via_device_id`,
+    and none of them re-states the SmartCoop's own identity (manufacturer/
+    model/sw_version live on the root device only).
     """
     _api, entry = setup_entry
     root_device = _device_for_identifier(hass, entry, SMART_COOP_ID)

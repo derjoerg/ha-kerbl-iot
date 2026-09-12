@@ -17,6 +17,7 @@ from typing import Any, TypeAlias
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from kerbl_iot import (
@@ -29,7 +30,7 @@ from kerbl_iot import (
     SmartCoopLog,
 )
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER, MODEL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +67,12 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
             update_interval=FALLBACK_UPDATE_INTERVAL,
         )
         self.kerbl = kerbl
+        # Populated by _async_register_smart_coop_devices(), before any
+        # entity platform runs: maps a SmartCoop's own ID to the internal
+        # device registry ID Home Assistant assigned its root device, so
+        # sub-device entities (see entity.KerblIotEntity) can link back to
+        # it with via_device_id.
+        self.smart_coop_device_ids: dict[str, str] = {}
         kerbl.register_smart_coop_update_callback(self._handle_push_update)
         kerbl.register_availability_callback(self._handle_availability_change)
         kerbl.register_smart_coop_log_callback(self._handle_log_refresh)
@@ -81,6 +88,7 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
         instead of an unrelated-looking websocket-connect failure.
         """
         await self._async_load()
+        self._async_register_smart_coop_devices()
         try:
             await self.kerbl.connect_websocket()
         except KerblConnectionError:
@@ -93,6 +101,34 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
                 self.config_entry.title,
                 FALLBACK_UPDATE_INTERVAL,
             )
+
+    def _async_register_smart_coop_devices(self) -> None:
+        """Pre-register each SmartCoop's root device before entities are set up.
+
+        Sub-device entities link back to their SmartCoop via
+        ``via_device_id``, which -- unlike the older ``via_device``
+        identifier-tuple form it replaces -- must name the SmartCoop's
+        *own* device registry entry by its already-assigned internal ID.
+        That ID only exists once the device itself has been created, so it
+        has to happen here, before any entity platform (and therefore
+        before any sub-device) is set up. Root-device entities (e.g. the
+        air temperature sensor) still declare their own ``device_info``
+        with the same ``identifiers``; Home Assistant matches that back to
+        this same device rather than creating a second one, so keeping the
+        device's own fields (name, sw_version, ...) current stays entirely
+        their job -- this only needs the ID.
+        """
+        device_registry = dr.async_get(self.hass)
+        for smart_coop in self.kerbl.smart_coops:
+            device = device_registry.async_get_or_create(
+                config_entry_id=self.config_entry.entry_id,
+                identifiers={(DOMAIN, smart_coop.id)},
+                name=smart_coop.name,
+                manufacturer=MANUFACTURER,
+                model=MODEL,
+                sw_version=smart_coop.firmware_version,
+            )
+            self.smart_coop_device_ids[smart_coop.id] = device.id
 
     async def _async_update_data(self) -> dict[str, SmartCoop]:
         """Poll fallback: re-fetch every SmartCoop for this account over REST."""

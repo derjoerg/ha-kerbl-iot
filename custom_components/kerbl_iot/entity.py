@@ -7,18 +7,15 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from kerbl_iot import SmartCoop
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUFACTURER, MODEL
 from .coordinator import KerblIotDataUpdateCoordinator
-
-MANUFACTURER = "Kerbl"
-MODEL = "SmartCoop"
 
 # Kerbl's SmartCoop is itself made up of distinct physical components -- a
 # door, a light, a feeder, a water heater, a brightness sensor -- each with
 # its own entities. Rather than putting all of their entities on one flat
 # SmartCoop device, each becomes its own Home Assistant device, linked back
-# to the SmartCoop root device via `via_device` (own device page, own area
-# assignment, own diagnostics download). These are the device-identifier
+# to the SmartCoop root device via `via_device_id` (own device page, own
+# area assignment, own diagnostics download). These are the device-identifier
 # suffixes and `translation_key`s for the five sub-devices every SmartCoop
 # has; pass one of them as `sub_device` to `KerblIotEntity.__init__` to put
 # an entity on that device instead of on the SmartCoop root device.
@@ -84,19 +81,16 @@ class KerblIotEntity(CoordinatorEntity[KerblIotDataUpdateCoordinator]):
                 sw_version=smart_coop.firmware_version,
             )
         else:
+            # `via_device_id` needs the SmartCoop root device's own,
+            # already-assigned internal registry ID -- not the older
+            # `via_device` identifier-tuple form -- so the coordinator
+            # pre-registers that root device (see
+            # KerblIotDataUpdateCoordinator._async_register_smart_coop_devices)
+            # before any entity platform, and therefore any sub-device,
+            # is set up.
             self._attr_device_info = DeviceInfo(
                 identifiers={(DOMAIN, f"{smart_coop_id}_{sub_device}")},
-                # `via_device` (an identifier tuple) rather than the newer
-                # `via_device_id` (the parent device's internal registry
-                # ID): `via_device` is deprecated on very recent Home
-                # Assistant releases in favor of `via_device_id`, but still
-                # works today -- a logged warning for custom integrations,
-                # not an error, see homeassistant.helpers.frame.report_usage
-                # -- and unlike `via_device_id` it doesn't require this
-                # integration to bump its declared minimum Home Assistant
-                # version (hacs.json: 2024.12.0) just to link sub-devices to
-                # their SmartCoop.
-                via_device=(DOMAIN, smart_coop_id),
+                via_device_id=coordinator.smart_coop_device_ids[smart_coop_id],
                 translation_key=sub_device,
                 manufacturer=MANUFACTURER,
             )

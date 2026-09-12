@@ -18,9 +18,15 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.kerbl_iot.const import CONF_REFRESH_TOKEN, DOMAIN
+from custom_components.kerbl_iot.const import (
+    CONF_REFRESH_TOKEN,
+    DOMAIN,
+    MANUFACTURER,
+    MODEL,
+)
 from custom_components.kerbl_iot.coordinator import (
     FALLBACK_UPDATE_INTERVAL,
     KerblIotDataUpdateCoordinator,
@@ -208,6 +214,33 @@ async def test_get_active_smart_coop_logs_filters_out_inactive_entries(
     active_logs = coordinator.get_active_smart_coop_logs(SMART_COOP_ID)
 
     assert [log.error_code for log in active_logs] == [42]
+
+
+async def test_root_device_is_pre_registered_before_first_refresh_returns(
+    hass: HomeAssistant,
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+) -> None:
+    """The SmartCoop root device exists, with a real ID, once setup finishes.
+
+    Sub-device entities need this device's internal registry ID (for
+    ``via_device_id``) to already exist by the time entity platforms run;
+    platforms are set up only after ``async_config_entry_first_refresh``
+    returns, so this device -- and ``smart_coop_device_ids`` -- must be
+    ready by then.
+    """
+    api = FakeApi([smart_coop_payload()])  # default firmwareVersion: "1.2.3"
+    coordinator = await make_coordinator(api)
+
+    assert coordinator.smart_coop_device_ids.keys() == {SMART_COOP_ID}
+    device_id = coordinator.smart_coop_device_ids[SMART_COOP_ID]
+
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device(identifiers={(DOMAIN, SMART_COOP_ID)})
+    assert device is not None
+    assert device.id == device_id
+    assert device.manufacturer == MANUFACTURER
+    assert device.model == MODEL
+    assert device.sw_version == "1.2.3"
 
 
 async def test_log_refresh_notifies_listeners(
