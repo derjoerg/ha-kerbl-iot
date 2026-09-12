@@ -17,3 +17,13 @@ pytest-cov
 # "AttributeError: module 'josepy' has no attribute 'ComparableX509'".
 # Pin to the last josepy release that still provides it.
 josepy<2
+
+# Same class of problem, one layer deeper: aiohttp imports aiodns at module
+# scope for accelerated DNS resolution (pulled in transitively, we never
+# asked for it), and aiodns's type hints reference pycares.ares_query_a_result
+# -- a class from pycares' pre-5.0 API. pycares 5.0 reworked its internals
+# and aiodns hasn't caught up yet, so an unpinned install breaks aiohttp's
+# import itself with "AttributeError: module 'pycares' has no attribute
+# 'ares_query_a_result'" before any of our own code runs.
+# Pin to the last pycares major version aiodns still supports.
+pycares<5
