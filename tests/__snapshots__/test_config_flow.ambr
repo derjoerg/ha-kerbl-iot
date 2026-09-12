@@ -1,0 +1,8 @@
+# serializer version: 1
+# name: test_user_flow_creates_entry
+  dict({
+    'access_token': 'access-123',
+    'email': 'farmer@example.com',
+    'refresh_token': 'refresh-456',
+  })
+# ---
