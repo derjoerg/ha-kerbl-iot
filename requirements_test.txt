@@ -2,3 +2,12 @@
 pytest-homeassistant-custom-component
 syrupy>=4.7,<5
 pytest-cov>=5,<6
+
+# pytest-homeassistant-custom-component pulls in Home Assistant core, which
+# imports hass-nabucasa -> acme at collection time even though this
+# integration never touches either. Unpinned, pip resolves the latest
+# josepy, which dropped the ComparableX509 compat class that the acme
+# version bundled here still relies on, breaking test collection with
+# "AttributeError: module 'josepy' has no attribute 'ComparableX509'".
+# Pin to the last josepy release that still provides it.
+josepy<2
