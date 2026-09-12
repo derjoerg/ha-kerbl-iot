@@ -38,7 +38,16 @@ async def test_setup_and_unload_entry(hass: HomeAssistant) -> None:
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
         assert entry.state is ConfigEntryState.LOADED
-        mock_load.assert_awaited_once()
+        # load() runs three times here only because this mock is a pure
+        # no-op and never actually populates KerblIOT._smart_coops: the
+        # coordinator's own explicit load (for auth/connection error
+        # handling), KerblIOT.connect_websocket()'s "load if I don't have
+        # any devices yet" guard (which keeps re-triggering since the
+        # mocked load never satisfies it), and the coordinator's first
+        # regular _async_update_data() poll. A real load populates the
+        # SmartCoop list, so connect_websocket()'s guard fires at most
+        # once -- two real HTTP requests per setup in production, not three.
+        assert mock_load.await_count == 3
 
         assert await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()

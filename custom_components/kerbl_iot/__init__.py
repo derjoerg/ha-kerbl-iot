@@ -1,48 +1,29 @@
 """The Kerbl IoT integration.
 
 Sets up a Kerbl account (one config entry per account) by restoring its
-stored tokens onto a ``KerblIOTApi`` client and confirming the session is
-still valid via one authenticated call. A push-driven
-``DataUpdateCoordinator`` built around the resulting ``KerblIOT`` wrapper,
-and the entity platforms themselves, are added in later build-out steps.
+stored tokens onto a ``KerblIOTApi`` client and handing the resulting
+``KerblIOT`` wrapper to a ``KerblIotDataUpdateCoordinator`` (see
+``coordinator.py``), which keeps its SmartCoop devices current -- primarily
+via Socket.IO push updates, with a polling fallback -- for the entity
+platforms added in later build-out steps.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TypeAlias
-
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_EMAIL
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from kerbl_iot import (
-    KerblAuthenticationError,
-    KerblConnectionError,
-    KerblIOT,
-    KerblIOTApi,
-    KerblProtocolError,
-)
+from kerbl_iot import KerblIOT, KerblIOTApi
 
 from .const import CONF_REFRESH_TOKEN, PLATFORMS
+from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
 
 # The client is reconstructed from stored tokens via restore_tokens(), so the
 # password is never needed (and never available) again after the config
 # flow. login() -- the only place the client uses it -- is never called on
 # this instance; the placeholder is kept only to satisfy the constructor.
 _UNUSED_PASSWORD_PLACEHOLDER = ""
-
-
-@dataclass
-class KerblIotRuntimeData:
-    """Runtime data attached to a Kerbl IoT config entry."""
-
-    kerbl: KerblIOT
-
-
-KerblIotConfigEntry: TypeAlias = ConfigEntry[KerblIotRuntimeData]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: KerblIotConfigEntry) -> bool:
@@ -63,23 +44,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: KerblIotConfigEntry) -> 
     api.restore_tokens(entry.data[CONF_ACCESS_TOKEN], entry.data[CONF_REFRESH_TOKEN])
     kerbl = KerblIOT(api)
 
-    try:
-        # Loads the account's SmartCoops, which both confirms the restored
-        # tokens are still valid and gives the coordinator (added next) a
-        # populated KerblIOT to start from.
-        await kerbl.load()
-    except KerblAuthenticationError as err:
-        await kerbl.async_close()
-        raise ConfigEntryAuthFailed(
-            "Kerbl IoT session expired; reauthentication required."
-        ) from err
-    except (KerblConnectionError, KerblProtocolError) as err:
-        await kerbl.async_close()
-        raise ConfigEntryNotReady(
-            "Kerbl IoT service is currently unreachable."
-        ) from err
+    # Loading, translating auth/connection errors into the
+    # ConfigEntryAuthFailed / ConfigEntryNotReady Home Assistant expects from
+    # a first refresh, and opening the Socket.IO push channel all happen
+    # inside the coordinator itself (KerblIotDataUpdateCoordinator._async_setup).
+    coordinator = KerblIotDataUpdateCoordinator(hass, entry, kerbl)
+    await coordinator.async_config_entry_first_refresh()
 
-    entry.runtime_data = KerblIotRuntimeData(kerbl=kerbl)
+    entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
