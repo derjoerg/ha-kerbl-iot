@@ -13,6 +13,10 @@ DOMAIN = "kerbl_iot"
 # This is a dict *key* name, not a credential value, hence the noqa below.
 CONF_REFRESH_TOKEN: Final = "refresh_token"  # noqa: S105
 
-# Populated incrementally as entity platforms are implemented in later
-# build-out steps (sensor, cover, light, button, binary_sensor, ...).
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [
+    Platform.LIGHT,
+    Platform.COVER,
+    Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
+]

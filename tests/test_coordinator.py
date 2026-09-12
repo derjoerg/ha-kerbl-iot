@@ -1,18 +1,17 @@
 """Tests for KerblIotDataUpdateCoordinator.
 
 Exercises the coordinator directly against a small in-memory double for
-KerblIOTApi's transport (``_FakeApi``) rather than through the full config
-flow: no aiohttp or Socket.IO client is ever constructed, so these tests
-never touch a real socket -- and stay portable to platforms (see the
-project's own Windows/pytest-socket saga) where real socket creation during
-test setup is a problem in itself.
+KerblIOTApi's transport (see ``tests/kerbl_fakes.py``) rather than through
+the full config flow: no aiohttp or Socket.IO client is ever constructed,
+so these tests never touch a real socket -- and stay portable to platforms
+(see the project's own Windows/pytest-socket saga) where real socket
+creation during test setup is a problem in itself.
 """
 
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from datetime import timedelta
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -27,129 +26,24 @@ from custom_components.kerbl_iot.coordinator import (
     KerblIotDataUpdateCoordinator,
 )
 from kerbl_iot import (
-    CommandResult,
     KerblAuthenticationError,
     KerblConnectionError,
     KerblIOT,
     SmartCoop,
 )
+from tests.kerbl_fakes import SMART_COOP_ID, FakeApi, smart_coop_payload
 
 ENTRY_DATA = {
     "email": "farmer@example.com",
     "access_token": "access-123",
     CONF_REFRESH_TOKEN: "refresh-456",
 }
-SMART_COOP_ID = "coop-1"
-
-
-class _FakeApi:
-    """Minimal double for the KerblIOTApi surface KerblIOT relies on."""
-
-    def __init__(self, smart_coop_payloads: list[dict[str, Any]]) -> None:
-        self._payloads = smart_coop_payloads
-        self.websocket_connected = False
-        self.press_calls: list[str] = []
-        self.load_error: Exception | None = None
-        self.connect_error: Exception | None = None
-        self.smart_coop_update_callback: (
-            Callable[[SmartCoop], Awaitable[None]] | None
-        ) = None
-
-    async def get_smart_coops(self) -> list[SmartCoop]:
-        """Return freshly parsed SmartCoops, as a real GET would."""
-        if self.load_error is not None:
-            raise self.load_error
-        return [SmartCoop.from_api(payload, self) for payload in self._payloads]
-
-    async def get_smart_coop_logs(
-        self,
-        smart_coop_id: str,
-    ) -> list[Any]:
-        """Return no logs; log content isn't relevant to coordinator behavior."""
-        return []
-
-    async def connect_websocket(
-        self,
-        smart_coops: list[SmartCoop],
-        debug: bool = False,
-        *,
-        reconnection_attempts: int = 0,
-        reconnection_delay: float = 1.0,
-    ) -> None:
-        """Simulate a Socket.IO connect, or raise a configured failure."""
-        if self.connect_error is not None:
-            raise self.connect_error
-        self.websocket_connected = bool(smart_coops)
-
-    async def close(self) -> None:
-        """Simulate closing the transport."""
-        self.websocket_connected = False
-
-    def register_smart_coop_update_callback(
-        self, callback: Callable[[SmartCoop], Awaitable[None]]
-    ) -> None:
-        """Capture the callback so tests can simulate a push update."""
-        self.smart_coop_update_callback = callback
-
-    def register_socket_connect_callback(
-        self,
-        callback: Callable[[], Awaitable[None]],
-    ) -> None:
-        """Ignore: reconnect behavior isn't exercised by these tests."""
-
-    def register_socket_disconnect_callback(
-        self,
-        callback: Callable[[], Awaitable[None]],
-    ) -> None:
-        """Ignore: disconnect behavior isn't exercised by these tests."""
-
-    async def _press_light(
-        self,
-        smart_coop_id: str,
-    ) -> CommandResult:
-        self.press_calls.append("light")
-        return CommandResult(success=True, command_count=1)
-
-    async def _press_feeder(
-        self,
-        smart_coop_id: str,
-    ) -> CommandResult:
-        self.press_calls.append("feeder")
-        return CommandResult(success=True, command_count=1)
-
-    async def _press_door(
-        self,
-        smart_coop_id: str,
-    ) -> CommandResult:
-        self.press_calls.append("door")
-        return CommandResult(success=True, command_count=1)
-
-    async def _acknowledge_errors(
-        self,
-        smart_coop_id: str,
-        error_codes: list[int],
-    ) -> CommandResult:
-        self.press_calls.append("acknowledge")
-        return CommandResult(success=True, command_count=len(error_codes))
-
-
-def _smart_coop_payload(**overrides: Any) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "id": SMART_COOP_ID,
-        "userId": "user-1",
-        "description": "Henhouse",
-        "isOnline": True,
-        "light": {"currentDimValue": 0},
-        "door": {"state": 79},  # DoorState.OPEN
-    }
-    payload.update(overrides)
-    return payload
 
 
 @pytest.fixture
 async def make_coordinator(
     hass: HomeAssistant,
-) -> AsyncGenerator[Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]]]:
+) -> AsyncGenerator[Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]]]:
     """Build a coordinator around a fake transport and shut it down afterward.
 
     ``async_config_entry_first_refresh`` requires the entry to be in
@@ -161,7 +55,7 @@ async def make_coordinator(
     """
     created: list[KerblIotDataUpdateCoordinator] = []
 
-    async def _factory(api: _FakeApi) -> KerblIotDataUpdateCoordinator:
+    async def _factory(api: FakeApi) -> KerblIotDataUpdateCoordinator:
         entry = MockConfigEntry(
             domain=DOMAIN, unique_id="farmer@example.com", data=ENTRY_DATA
         )
@@ -184,10 +78,10 @@ async def make_coordinator(
 
 
 async def test_first_refresh_loads_devices_and_opens_push_channel(
-    make_coordinator: Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
     """The first refresh loads all SmartCoops and connects the push channel."""
-    api = _FakeApi([_smart_coop_payload()])
+    api = FakeApi([smart_coop_payload()])
     coordinator = await make_coordinator(api)
 
     assert coordinator.last_update_success
@@ -202,17 +96,17 @@ def test_fallback_update_interval_is_15_to_20_minutes() -> None:
 
 
 async def test_push_update_feeds_async_set_updated_data(
-    make_coordinator: Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
     """A Socket.IO push update reaches listeners via async_set_updated_data."""
-    api = _FakeApi([_smart_coop_payload()])
+    api = FakeApi([smart_coop_payload()])
     coordinator = await make_coordinator(api)
 
     listener = MagicMock()
     coordinator.async_add_listener(listener)
 
     assert api.smart_coop_update_callback is not None
-    pushed = SmartCoop.from_api(_smart_coop_payload(light={"currentDimValue": 80}), api)
+    pushed = SmartCoop.from_api(smart_coop_payload(light={"currentDimValue": 80}), api)
     await api.smart_coop_update_callback(pushed)
 
     assert coordinator.data[SMART_COOP_ID].light.current_dim_value == 80
@@ -220,10 +114,10 @@ async def test_push_update_feeds_async_set_updated_data(
 
 
 async def test_websocket_connect_failure_is_not_fatal(
-    make_coordinator: Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
     """A push-channel failure still leaves the coordinator on its polling fallback."""
-    api = _FakeApi([_smart_coop_payload()])
+    api = FakeApi([smart_coop_payload()])
     api.connect_error = KerblConnectionError("socket unreachable")
     coordinator = await make_coordinator(api)
 
@@ -232,10 +126,10 @@ async def test_websocket_connect_failure_is_not_fatal(
 
 
 async def test_load_failure_raises_auth_failed(
-    make_coordinator: Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
     """An expired session during the first refresh triggers Home Assistant reauth."""
-    api = _FakeApi([_smart_coop_payload()])
+    api = FakeApi([smart_coop_payload()])
     api.load_error = KerblAuthenticationError("expired")
 
     with pytest.raises(ConfigEntryAuthFailed):
@@ -243,10 +137,10 @@ async def test_load_failure_raises_auth_failed(
 
 
 async def test_command_success_pushes_confirmed_state(
-    make_coordinator: Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
     """A successful command presses the device and immediately pushes new state."""
-    api = _FakeApi([_smart_coop_payload()])
+    api = FakeApi([smart_coop_payload()])
     coordinator = await make_coordinator(api)
 
     listener = MagicMock()
@@ -259,10 +153,10 @@ async def test_command_success_pushes_confirmed_state(
 
 
 async def test_command_translates_state_error(
-    make_coordinator: Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
     """A command Kerbl refuses (bad device state) surfaces as HomeAssistantError."""
-    api = _FakeApi([_smart_coop_payload(door={"state": 63})])  # DoorState.UNKNOWN
+    api = FakeApi([smart_coop_payload(door={"state": 63})])  # DoorState.UNKNOWN
     coordinator = await make_coordinator(api)
 
     with pytest.raises(HomeAssistantError):
@@ -270,10 +164,10 @@ async def test_command_translates_state_error(
 
 
 async def test_command_unknown_smart_coop_raises(
-    make_coordinator: Callable[[_FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
     """Commanding a SmartCoop ID the coordinator doesn't know about is an error."""
-    api = _FakeApi([_smart_coop_payload()])
+    api = FakeApi([smart_coop_payload()])
     coordinator = await make_coordinator(api)
 
     with pytest.raises(HomeAssistantError):

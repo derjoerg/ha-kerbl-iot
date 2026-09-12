@@ -27,5 +27,48 @@
       "already_configured": "Dieses Kerbl IoT-Konto ist bereits eingerichtet.",
       "reauth_successful": "Die erneute Authentifizierung war erfolgreich."
     }
+  },
+  "entity": {
+    "light": {
+      "light": { "name": "Licht" }
+    },
+    "cover": {
+      "door": { "name": "Tür" }
+    },
+    "button": {
+      "feed_now": { "name": "Jetzt füttern" },
+      "acknowledge_errors": { "name": "Fehler quittieren" }
+    },
+    "sensor": {
+      "air_temperature": { "name": "Temperatur" },
+      "water_temperature": { "name": "Wassertemperatur" },
+      "brightness": { "name": "Helligkeit" },
+      "firmware_version": { "name": "Firmware-Version" },
+      "door_closes_in": { "name": "Tür schließt in" },
+      "current_error": { "name": "Aktueller Fehler" },
+      "door_state": {
+        "name": "Türstatus",
+        "state": {
+          "unknown": "Unbekannt",
+          "simulate": "Simulation",
+          "open": "Offen",
+          "closing": "Schließt",
+          "closed": "Geschlossen",
+          "opening": "Öffnet",
+          "toggle_manual": "Manuell umgeschaltet",
+          "unlock": "Entriegelt",
+          "lock_until_tomorrow": "Bis morgen gesperrt",
+          "lock_permanently": "Dauerhaft gesperrt"
+        }
+      }
+    },
+    "binary_sensor": {
+      "online": { "name": "Online" },
+      "feeding_in_progress": { "name": "Fütterung läuft" },
+      "feed_empty": { "name": "Futter leer" },
+      "feeding_locked": { "name": "Fütterung gesperrt" },
+      "water_sensor": { "name": "Wassersensor" },
+      "external_brightness_sensor": { "name": "Externer Helligkeitssensor" }
+    }
   }
 }
