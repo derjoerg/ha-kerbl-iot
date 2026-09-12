@@ -40,11 +40,19 @@ async def test_user_flow_creates_entry(
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
 
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {"email": TEST_EMAIL, "password": TEST_PASSWORD},
-    )
-    await hass.async_block_till_done()
+    # Creating the entry immediately triggers Home Assistant's own
+    # auto-setup for it (async_setup_entry runs as part of finishing the
+    # flow); stub out its I/O so the test stays offline, same as the
+    # reauth-success path below.
+    with (
+        patch("kerbl_iot.KerblIOT.load", AsyncMock(return_value=None)),
+        patch("kerbl_iot.KerblIOT.async_close", AsyncMock(return_value=None)),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {"email": TEST_EMAIL, "password": TEST_PASSWORD},
+        )
+        await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == f"Kerbl IoT ({TEST_EMAIL})"
@@ -134,7 +142,13 @@ async def test_reauth_flow_updates_tokens(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
-    assert result["description_placeholders"] == {"email": TEST_EMAIL}
+    # Home Assistant's flow manager merges the entry's title into
+    # description_placeholders as "name" for reauth flows -- not something
+    # async_step_reauth_confirm adds itself.
+    assert result["description_placeholders"] == {
+        "email": TEST_EMAIL,
+        "name": entry.title,
+    }
 
     # Reauth success reloads the entry, which re-enters async_setup_entry;
     # stub out its I/O so the test stays offline.
