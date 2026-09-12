@@ -1,0 +1,48 @@
+name: Release
+
+# HACS shows a repository's raw commit hash instead of a version number
+# until GitHub Releases (tagged, ideally with notes) exist for it. This
+# workflow creates one automatically whenever manifest.json's own
+# "version" field changes on `main`, so every version bump this project
+# makes is a real, HACS-visible release without a separate manual step.
+on:
+  push:
+    branches: [main]
+    paths:
+      - custom_components/kerbl_iot/manifest.json
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history (not the default shallow clone), so the "does
+          # this tag already exist" check below can see every past tag.
+          fetch-depth: 0
+
+      - name: Read version from manifest.json
+        id: version
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('custom_components/kerbl_iot/manifest.json'))['version'])")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this version was already released
+        id: check
+        run: |
+          if git rev-parse "refs/tags/${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: ${{ steps.version.outputs.version }}
+          generate_release_notes: true

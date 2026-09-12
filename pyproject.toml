@@ -1,6 +1,6 @@
 [project]
 name = "ha-kerbl-iot"
-version = "0.1.0"
+version = "0.3.0"
 description = "Home Assistant custom integration for Kerbl IoT (SmartCoop and future Kerbl product lines)"
 requires-python = ">=3.13"
 license = { text = "MIT" }
