@@ -216,31 +216,56 @@ async def test_get_active_smart_coop_logs_filters_out_inactive_entries(
     assert [log.error_code for log in active_logs] == [42]
 
 
-async def test_root_device_is_pre_registered_before_first_refresh_returns(
+async def test_root_and_sub_devices_are_pre_registered_and_linked(
     hass: HomeAssistant,
     make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
 ) -> None:
-    """The SmartCoop root device exists, with a real ID, once setup finishes.
+    """Root + sub-devices exist, linked, before entity platforms would run.
 
-    Sub-device entities need this device's internal registry ID (for
-    ``via_device_id``) to already exist by the time entity platforms run;
-    platforms are set up only after ``async_config_entry_first_refresh``
-    returns, so this device -- and ``smart_coop_device_ids`` -- must be
-    ready by then.
+    Entity platforms are only set up after
+    ``async_config_entry_first_refresh`` returns, so every device --  the
+    SmartCoop root device and its five sub-devices -- and the
+    ``via_device_id`` link between them must already exist by then; nothing
+    here depends on any entity ever declaring ``device_info``.
     """
     api = FakeApi([smart_coop_payload()])  # default firmwareVersion: "1.2.3"
     coordinator = await make_coordinator(api)
 
     assert coordinator.smart_coop_device_ids.keys() == {SMART_COOP_ID}
-    device_id = coordinator.smart_coop_device_ids[SMART_COOP_ID]
+    root_device_id = coordinator.smart_coop_device_ids[SMART_COOP_ID]
 
     device_registry = dr.async_get(hass)
-    device = device_registry.async_get_device(identifiers={(DOMAIN, SMART_COOP_ID)})
-    assert device is not None
-    assert device.id == device_id
-    assert device.manufacturer == MANUFACTURER
-    assert device.model == MODEL
-    assert device.sw_version == "1.2.3"
+    root_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, SMART_COOP_ID)}
+    )
+    assert root_device is not None
+    assert root_device.id == root_device_id
+    assert root_device.manufacturer == MANUFACTURER
+    assert root_device.model == MODEL
+    assert root_device.sw_version == "1.2.3"
+
+    for sub_device_key in ("door", "light", "feeder", "water_heater", "brightness"):
+        sub_device = device_registry.async_get_device(
+            identifiers={(DOMAIN, f"{SMART_COOP_ID}_{sub_device_key}")}
+        )
+        assert sub_device is not None
+        assert sub_device.via_device_id == root_device.id
+        assert sub_device.manufacturer == MANUFACTURER
+
+
+async def test_door_sub_device_is_skipped_without_a_door(
+    hass: HomeAssistant,
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+) -> None:
+    """A SmartCoop reporting no door gets no pre-registered Door device."""
+    api = FakeApi([smart_coop_payload(door={"state": 79, "hasNoDoor": True})])
+    await make_coordinator(api)
+
+    device_registry = dr.async_get(hass)
+    door_device = device_registry.async_get_device(
+        identifiers={(DOMAIN, f"{SMART_COOP_ID}_door")}
+    )
+    assert door_device is None
 
 
 async def test_log_refresh_notifies_listeners(

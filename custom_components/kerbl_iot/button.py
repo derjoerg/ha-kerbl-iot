@@ -8,8 +8,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import SUB_DEVICE_FEEDER
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import SUB_DEVICE_FEEDER, KerblIotEntity
+from .entity import KerblIotEntity
 
 
 async def async_setup_entry(

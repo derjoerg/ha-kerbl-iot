@@ -10,20 +10,11 @@ from kerbl_iot import SmartCoop
 from .const import DOMAIN, MANUFACTURER, MODEL
 from .coordinator import KerblIotDataUpdateCoordinator
 
-# Kerbl's SmartCoop is itself made up of distinct physical components -- a
-# door, a light, a feeder, a water heater, a brightness sensor -- each with
-# its own entities. Rather than putting all of their entities on one flat
-# SmartCoop device, each becomes its own Home Assistant device, linked back
-# to the SmartCoop root device via `via_device_id` (own device page, own
-# area assignment, own diagnostics download). These are the device-identifier
-# suffixes and `translation_key`s for the five sub-devices every SmartCoop
-# has; pass one of them as `sub_device` to `KerblIotEntity.__init__` to put
-# an entity on that device instead of on the SmartCoop root device.
-SUB_DEVICE_DOOR = "door"
-SUB_DEVICE_LIGHT = "light"
-SUB_DEVICE_FEEDER = "feeder"
-SUB_DEVICE_WATER_HEATER = "water_heater"
-SUB_DEVICE_BRIGHTNESS = "brightness"
+# The SUB_DEVICE_* constants themselves now live in .const (the coordinator
+# needs them too, to pre-register sub-devices before entity platforms run --
+# see KerblIotDataUpdateCoordinator._async_register_smart_coop_devices).
+# Platform modules (light.py, cover.py, button.py, sensor.py,
+# binary_sensor.py) import them from .const directly.
 
 
 class KerblIotEntity(CoordinatorEntity[KerblIotDataUpdateCoordinator]):
@@ -81,16 +72,18 @@ class KerblIotEntity(CoordinatorEntity[KerblIotDataUpdateCoordinator]):
                 sw_version=smart_coop.firmware_version,
             )
         else:
-            # `via_device_id` needs the SmartCoop root device's own,
-            # already-assigned internal registry ID -- not the older
-            # `via_device` identifier-tuple form -- so the coordinator
-            # pre-registers that root device (see
-            # KerblIotDataUpdateCoordinator._async_register_smart_coop_devices)
-            # before any entity platform, and therefore any sub-device,
-            # is set up.
+            # No `via_device`/`via_device_id` here: the coordinator already
+            # pre-registers this sub-device and links it to the SmartCoop
+            # root device via `via_device_id` before any entity platform
+            # runs (see
+            # KerblIotDataUpdateCoordinator._async_register_smart_coop_devices
+            # for why that link is set there rather than here). Home
+            # Assistant matches this `device_info` back to that same,
+            # already-linked device by `identifiers`, so this only needs to
+            # keep the device's own fields (translation_key, manufacturer)
+            # current -- not restate the link.
             self._attr_device_info = DeviceInfo(
                 identifiers={(DOMAIN, f"{smart_coop_id}_{sub_device}")},
-                via_device_id=coordinator.smart_coop_device_ids[smart_coop_id],
                 translation_key=sub_device,
                 manufacturer=MANUFACTURER,
             )

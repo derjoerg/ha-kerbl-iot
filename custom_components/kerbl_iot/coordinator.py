@@ -30,7 +30,7 @@ from kerbl_iot import (
     SmartCoopLog,
 )
 
-from .const import DOMAIN, MANUFACTURER, MODEL
+from .const import DOMAIN, MANUFACTURER, MODEL, SUB_DEVICE_DOOR, SUB_DEVICES
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,9 +69,12 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
         self.kerbl = kerbl
         # Populated by _async_register_smart_coop_devices(), before any
         # entity platform runs: maps a SmartCoop's own ID to the internal
-        # device registry ID Home Assistant assigned its root device, so
-        # sub-device entities (see entity.KerblIotEntity) can link back to
-        # it with via_device_id.
+        # device registry ID Home Assistant assigned its root device.
+        # Nothing outside this coordinator currently needs it -- entities
+        # match their pre-registered device by `identifiers`, not this ID
+        # -- but it's kept as a small, cheap-to-maintain hook for anything
+        # that later needs the root device without a registry lookup (e.g.
+        # diagnostics).
         self.smart_coop_device_ids: dict[str, str] = {}
         kerbl.register_smart_coop_update_callback(self._handle_push_update)
         kerbl.register_availability_callback(self._handle_availability_change)
@@ -103,24 +106,33 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
             )
 
     def _async_register_smart_coop_devices(self) -> None:
-        """Pre-register each SmartCoop's root device before entities are set up.
+        """Pre-register each SmartCoop's root and sub-devices, and link them.
 
-        Sub-device entities link back to their SmartCoop via
-        ``via_device_id``, which -- unlike the older ``via_device``
-        identifier-tuple form it replaces -- must name the SmartCoop's
-        *own* device registry entry by its already-assigned internal ID.
-        That ID only exists once the device itself has been created, so it
-        has to happen here, before any entity platform (and therefore
-        before any sub-device) is set up. Root-device entities (e.g. the
-        air temperature sensor) still declare their own ``device_info``
-        with the same ``identifiers``; Home Assistant matches that back to
-        this same device rather than creating a second one, so keeping the
-        device's own fields (name, sw_version, ...) current stays entirely
-        their job -- this only needs the ID.
+        Sub-devices are linked back to their SmartCoop root device via
+        ``via_device_id``: the *internal*, already-assigned device registry
+        ID of the root device -- not the older, now-deprecated ``via_device``
+        identifier-tuple form. Setting it is done here, through
+        ``async_update_device``, rather than via each sub-device entity's own
+        ``device_info`` (the more obviously "entity-owned" way to do it):
+        ``via_device_id`` has been a stable ``async_update_device`` parameter
+        since long before this integration's declared minimum Home Assistant
+        version (2024.12.0), whereas the ``DeviceInfo`` TypedDict entities
+        populate their ``device_info`` from has only just started gaining a
+        ``via_device_id`` key on some installs and not, as of this writing,
+        on others -- mypy rejects it as an unknown key wherever it hasn't
+        landed yet. Doing the linking here avoids depending on that
+        still-rolling-out surface entirely.
+
+        Entities still declare their own ``device_info`` for both the root
+        device and each sub-device (matched back to the devices created here
+        by their shared ``identifiers``), so keeping fields like name,
+        sw_version or translation_key current stays entirely their job --
+        this only needs the devices to exist, linked, before any entity
+        platform (and therefore any sub-device entity) is set up.
         """
         device_registry = dr.async_get(self.hass)
         for smart_coop in self.kerbl.smart_coops:
-            device = device_registry.async_get_or_create(
+            root_device = device_registry.async_get_or_create(
                 config_entry_id=self.config_entry.entry_id,
                 identifiers={(DOMAIN, smart_coop.id)},
                 name=smart_coop.name,
@@ -128,7 +140,28 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
                 model=MODEL,
                 sw_version=smart_coop.firmware_version,
             )
-            self.smart_coop_device_ids[smart_coop.id] = device.id
+            self.smart_coop_device_ids[smart_coop.id] = root_device.id
+
+            for sub_device in SUB_DEVICES:
+                # A SmartCoop reporting no door (hasNoDoor) gets no Door
+                # device at all -- not just no entities on it -- matching
+                # the door platforms' own has_no_door check (cover.py,
+                # sensor.py).
+                is_missing_door = (
+                    sub_device == SUB_DEVICE_DOOR
+                    and smart_coop.door.has_no_door is True
+                )
+                if is_missing_door:
+                    continue
+                sub_device_entry = device_registry.async_get_or_create(
+                    config_entry_id=self.config_entry.entry_id,
+                    identifiers={(DOMAIN, f"{smart_coop.id}_{sub_device}")},
+                    translation_key=sub_device,
+                    manufacturer=MANUFACTURER,
+                )
+                device_registry.async_update_device(
+                    sub_device_entry.id, via_device_id=root_device.id
+                )
 
     async def _async_update_data(self) -> dict[str, SmartCoop]:
         """Poll fallback: re-fetch every SmartCoop for this account over REST."""

@@ -14,8 +14,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from kerbl_iot import DoorState
 
+from .const import SUB_DEVICE_DOOR
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import SUB_DEVICE_DOOR, KerblIotEntity
+from .entity import KerblIotEntity
 
 # (is_closed, is_opening, is_closing) for the door states that map onto a
 # clear cover position. States outside this map (SIMULATE, TOGGLE_MANUAL,

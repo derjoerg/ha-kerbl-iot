@@ -23,14 +23,14 @@ from homeassistant.helpers.typing import StateType
 
 from kerbl_iot import DoorState, SmartCoop
 
-from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import (
+from .const import (
     SUB_DEVICE_BRIGHTNESS,
     SUB_DEVICE_DOOR,
     SUB_DEVICE_LIGHT,
     SUB_DEVICE_WATER_HEATER,
-    KerblIotEntity,
 )
+from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
+from .entity import KerblIotEntity
 
 _DOOR_STATE_OPTIONS = [state.name.lower() for state in DoorState]
 # These two only make sense for a SmartCoop that actually reports a door.

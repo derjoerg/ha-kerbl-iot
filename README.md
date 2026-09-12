@@ -44,8 +44,7 @@ e-mail, are rejected).
   entry; you can add as many Kerbl accounts as you like.
 - **Devices with sub-devices.** A SmartCoop is modelled as one Home
   Assistant device, with its door, light, feeder, water heater and
-  brightness sensor represented as linked sub-devices (`via_device_id`,
-  which requires Home Assistant 2026.8.0 or newer -- see below).
+  brightness sensor represented as linked sub-devices (`via_device_id`).
 - **Push-driven, poll as fallback.** One `DataUpdateCoordinator` per config
   entry (= per account), fed primarily by the `kerbl-iot` Socket.IO push
   callbacks; `update_interval` (15–20 minutes) exists only as a
@@ -62,10 +61,12 @@ e-mail, are rejected).
 Every SmartCoop is one Home Assistant device (the root device, carrying its
 firmware version as a device property, not a separate entity) plus five
 linked sub-devices – one per physical component – each shown as its own
-device page and linked back to the root device via `via_device_id`. This
-integration therefore requires **Home Assistant 2026.8.0 or newer** (the
-first release where `via_device_id` is usable from an entity's own
-`device_info`, replacing the older `via_device` identifier-tuple form).
+device page and linked back to the root device via `via_device_id`. The
+coordinator pre-registers and links every device before any entity platform
+runs (`async_update_device(..., via_device_id=...)`, a long-stable API),
+rather than an entity linking itself through `device_info` – the newer
+`via_device_id` key on entities' own `DeviceInfo` isn't consistently
+available yet across Home Assistant releases.
 
 | Device            | Entity                                    | Platform        |
 | ----------------- | ------------------------------------------ | --------------- |

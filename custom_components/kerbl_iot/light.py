@@ -9,8 +9,9 @@ from homeassistant.components.light.const import ColorMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import SUB_DEVICE_LIGHT
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import SUB_DEVICE_LIGHT, KerblIotEntity
+from .entity import KerblIotEntity
 
 
 async def async_setup_entry(

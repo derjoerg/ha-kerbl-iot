@@ -17,13 +17,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from kerbl_iot import SmartCoop
 
+from .const import SUB_DEVICE_BRIGHTNESS, SUB_DEVICE_FEEDER, SUB_DEVICE_WATER_HEATER
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import (
-    SUB_DEVICE_BRIGHTNESS,
-    SUB_DEVICE_FEEDER,
-    SUB_DEVICE_WATER_HEATER,
-    KerblIotEntity,
-)
+from .entity import KerblIotEntity
 
 
 @dataclass(frozen=True, kw_only=True)
