@@ -20,5 +20,5 @@ def test_manifest_matches_domain_constant() -> None:
     assert manifest["config_flow"] is True
     assert manifest["integration_type"] == "hub"
     assert manifest["iot_class"] == "cloud_push"
-    assert manifest["requirements"] == ["kerbl-iot==0.1.5"]
+    assert manifest["requirements"] == ["kerbl-iot==0.1.7"]
     assert all(owner.startswith("@") for owner in manifest["codeowners"])

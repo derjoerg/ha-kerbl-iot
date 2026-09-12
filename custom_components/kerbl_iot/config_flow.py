@@ -21,6 +21,8 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_EMAIL, CONF_PASSWORD
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     TextSelector,
     TextSelectorConfig,
@@ -62,16 +64,24 @@ STEP_REAUTH_DATA_SCHEMA = vol.Schema(
 )
 
 
-async def _async_sign_in(email: str, password: str) -> dict[str, str]:
+async def _async_sign_in(
+    hass: HomeAssistant, email: str, password: str
+) -> dict[str, str]:
     """Sign in once and return the token pair to persist on the entry.
 
-    The client is given its own aiohttp session (never Home Assistant's
-    shared one): the library only enables ``raise_for_status`` -- which its
-    error handling and its automatic refresh-on-401 retry rely on -- for a
-    session it creates and owns itself. Raises ``KerblAuthenticationError``,
+    Uses Home Assistant's shared aiohttp session rather than creating a
+    dedicated one: as of kerbl-iot 0.1.7 the client refreshes correctly on
+    a 401 regardless of who owns the session, and sends its bearer token
+    as a per-request header instead of writing it onto the session's
+    default headers -- so multiple accounts (and the rest of Home
+    Assistant) can safely share one session without one login's token
+    leaking onto another's requests. ``KerblIOTApi.close()`` never closes
+    a session it didn't create itself, so this call leaves the shared
+    session open for everyone else. Raises ``KerblAuthenticationError``,
     ``KerblConnectionError`` or ``KerblProtocolError`` on failure.
     """
-    api = KerblIOTApi(email=email, password=password)
+    session = async_get_clientsession(hass)
+    api = KerblIOTApi(email=email, password=password, session=session)
     try:
         await api.login()
         access_token, refresh_token = api.get_tokens()
@@ -97,7 +107,9 @@ class KerblIotConfigFlow(ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             try:
-                tokens = await _async_sign_in(email, user_input[CONF_PASSWORD])
+                tokens = await _async_sign_in(
+                    self.hass, email, user_input[CONF_PASSWORD]
+                )
             except KerblAuthenticationError:
                 errors["base"] = "invalid_auth"
             except KerblConnectionError:
@@ -136,7 +148,9 @@ class KerblIotConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                tokens = await _async_sign_in(email, user_input[CONF_PASSWORD])
+                tokens = await _async_sign_in(
+                    self.hass, email, user_input[CONF_PASSWORD]
+                )
             except KerblAuthenticationError:
                 errors["base"] = "invalid_auth"
             except KerblConnectionError:

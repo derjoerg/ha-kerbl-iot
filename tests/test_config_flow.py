@@ -49,7 +49,7 @@ async def test_user_flow_creates_entry(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == f"Kerbl IoT ({TEST_EMAIL})"
     assert result["data"] == {"email": TEST_EMAIL, **TEST_TOKENS}
-    mock_sign_in.assert_awaited_once_with(TEST_EMAIL, TEST_PASSWORD)
+    mock_sign_in.assert_awaited_once_with(hass, TEST_EMAIL, TEST_PASSWORD)
 
     entry = hass.config_entries.async_entries(DOMAIN)[0]
     assert entry.unique_id == TEST_EMAIL.lower()
@@ -150,7 +150,7 @@ async def test_reauth_flow_updates_tokens(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert entry.data == {"email": TEST_EMAIL, **TEST_TOKENS}
-    mock_sign_in.assert_awaited_once_with(TEST_EMAIL, TEST_PASSWORD)
+    mock_sign_in.assert_awaited_once_with(hass, TEST_EMAIL, TEST_PASSWORD)
 
 
 async def test_reauth_flow_invalid_password_keeps_form(

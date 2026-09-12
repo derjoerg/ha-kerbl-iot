@@ -9,6 +9,6 @@
   "issue_tracker": "https://github.com/derjoerg/ha-kerbl-iot/issues",
   "loggers": ["kerbl_iot"],
   "name": "Kerbl IoT",
-  "requirements": ["kerbl-iot==0.1.5"],
+  "requirements": ["kerbl-iot==0.1.7"],
   "version": "0.1.0"
 }

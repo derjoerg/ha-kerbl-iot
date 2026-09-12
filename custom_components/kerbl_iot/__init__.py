@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ACCESS_TOKEN, CONF_EMAIL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from kerbl_iot import (
     KerblAuthenticationError,
@@ -46,8 +47,18 @@ KerblIotConfigEntry: TypeAlias = ConfigEntry[KerblIotRuntimeData]
 
 async def async_setup_entry(hass: HomeAssistant, entry: KerblIotConfigEntry) -> bool:
     """Set up Kerbl IoT from a config entry."""
+    # Home Assistant's shared aiohttp session, not a dedicated one: since
+    # kerbl-iot 0.1.7 the bearer token is sent as a per-request header
+    # instead of being written onto the session's default headers, so
+    # multiple accounts (config entries) can safely share one session
+    # without one login's token leaking onto another account's requests.
+    # KerblIOTApi never closes a session it didn't create itself, so this
+    # shared session is left open for the rest of Home Assistant on unload.
+    session = async_get_clientsession(hass)
     api = KerblIOTApi(
-        email=entry.data[CONF_EMAIL], password=_UNUSED_PASSWORD_PLACEHOLDER
+        email=entry.data[CONF_EMAIL],
+        password=_UNUSED_PASSWORD_PLACEHOLDER,
+        session=session,
     )
     api.restore_tokens(entry.data[CONF_ACCESS_TOKEN], entry.data[CONF_REFRESH_TOKEN])
     kerbl = KerblIOT(api)
