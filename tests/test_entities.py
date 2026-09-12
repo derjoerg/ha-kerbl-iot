@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -43,6 +44,17 @@ def _entity_id(hass: HomeAssistant, platform: str, key: str) -> str:
     entity_id = registry.async_get_entity_id(platform, DOMAIN, _unique_id(key))
     assert entity_id is not None, f"No {platform} entity registered for key {key!r}"
     return entity_id
+
+
+def _device_for_identifier(
+    hass: HomeAssistant, entry: MockConfigEntry, identifier: str
+) -> dr.DeviceEntry:
+    """Look up a device registered by this entry via its (DOMAIN, identifier) tag."""
+    registry = dr.async_get(hass)
+    devices = dr.async_entries_for_config_entry(registry, entry.entry_id)
+    device = next((d for d in devices if (DOMAIN, identifier) in d.identifiers), None)
+    assert device is not None, f"No device registered for identifier {identifier!r}"
+    return device
 
 
 @pytest.fixture
@@ -90,13 +102,13 @@ async def test_expected_entities_are_created(
             "air_temperature",
             "water_temperature",
             "brightness",
-            "firmware_version",
+            "dim_value",
             "door_closes_in",
             "door_state",
-            "current_error",
         ],
         "binary_sensor": [
             "online",
+            "has_errors",
             "feeding_in_progress",
             "feed_empty",
             "feeding_locked",
@@ -109,6 +121,28 @@ async def test_expected_entities_are_created(
         for key in keys:
             entity_id = registry.async_get_entity_id(platform, DOMAIN, _unique_id(key))
             assert entity_id is not None, f"missing {platform} entity for {key!r}"
+
+
+async def test_sub_devices_are_linked_to_the_smart_coop_root_device(
+    hass: HomeAssistant, setup_entry: tuple[FakeApi, MockConfigEntry]
+) -> None:
+    """Door/light/feeder/water heater/brightness are their own devices.
+
+    Each is linked back to the SmartCoop root device via `via_device`, and
+    none of them re-states the SmartCoop's own identity (manufacturer/model/
+    sw_version live on the root device only).
+    """
+    _api, entry = setup_entry
+    root_device = _device_for_identifier(hass, entry, SMART_COOP_ID)
+    assert root_device.model == "SmartCoop"
+    assert root_device.sw_version == "1.2.3"
+
+    for sub_device_key in ("door", "light", "feeder", "water_heater", "brightness"):
+        sub_device = _device_for_identifier(
+            hass, entry, f"{SMART_COOP_ID}_{sub_device_key}"
+        )
+        assert sub_device.via_device_id == root_device.id
+        assert sub_device.id != root_device.id
 
 
 async def test_door_entities_are_skipped_without_a_door(hass: HomeAssistant) -> None:
@@ -132,6 +166,16 @@ async def test_door_entities_are_skipped_without_a_door(hass: HomeAssistant) -> 
         assert (
             registry.async_get_entity_id("sensor", DOMAIN, _unique_id("door_closes_in"))
             is None
+        )
+        # No entity ever declares the Door sub-device, so it's never created
+        # either -- not just left with no entities on it.
+        device_registry = dr.async_get(hass)
+        entry_devices = dr.async_entries_for_config_entry(
+            device_registry, entry.entry_id
+        )
+        door_identifier = (DOMAIN, f"{SMART_COOP_ID}_door")
+        assert not any(
+            door_identifier in device.identifiers for device in entry_devices
         )
         # Non-door entities are unaffected.
         light_entity_id = registry.async_get_entity_id(
@@ -244,10 +288,8 @@ async def test_sensor_values_reflect_the_smart_coop(
         "air_temperature": "18.5",
         "water_temperature": "12.5",
         "brightness": "500",
-        "firmware_version": "1.2.3",
+        "dim_value": "0",  # currentDimValue: 0 in the default payload
         "door_state": "open",
-        # current_error_reason is unset in the test payload -> None -> "unknown"
-        "current_error": "unknown",
     }
     for key, expected in hass_states.items():
         entity_id = _entity_id(hass, "sensor", key)
@@ -260,6 +302,7 @@ async def test_binary_sensor_values_reflect_the_smart_coop(
     """Binary sensor entities report on/off correctly, including the inverted one."""
     expected = {
         "online": "on",
+        "has_errors": "off",  # no logs are configured in the default payload
         "feeding_in_progress": "off",
         "feed_empty": "off",  # is_feed_full=True in the default payload
         "feeding_locked": "unknown",  # not set in the default payload -> None
@@ -269,6 +312,40 @@ async def test_binary_sensor_values_reflect_the_smart_coop(
     for key, state in expected.items():
         entity_id = _entity_id(hass, "binary_sensor", key)
         assert hass.states.get(entity_id).state == state, key
+
+
+async def test_has_errors_binary_sensor_reflects_active_logs(
+    hass: HomeAssistant, setup_entry: tuple[FakeApi, MockConfigEntry]
+) -> None:
+    """The has-errors sensor turns on and lists active errors once logs refresh.
+
+    Also exercises KerblIotDataUpdateCoordinator._handle_log_refresh: logs
+    refresh on KerblIOT's own separate log-callback list (see
+    coordinator.py), so without that wiring this sensor's cached state
+    would never reflect a newly active error.
+    """
+    api, entry = setup_entry
+    entity_id = _entity_id(hass, "binary_sensor", "has_errors")
+    assert hass.states.get(entity_id).state == "off"
+
+    api.logs[SMART_COOP_ID] = [
+        SmartCoopLog(
+            time="12:00",
+            date="2024.01.01",
+            active=True,
+            error_code=42,
+            error_key="err.some_error",
+            level="error",
+            occurred_at=None,
+            received_at=datetime.now(UTC),
+        )
+    ]
+    await entry.runtime_data.kerbl.refresh_smart_coop_logs(SMART_COOP_ID)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id)
+    assert state.state == "on"
+    assert state.attributes["active_errors"] == [{"code": 42, "key": "err.some_error"}]
 
 
 async def test_offline_smart_coop_entities_are_unavailable(hass: HomeAssistant) -> None:

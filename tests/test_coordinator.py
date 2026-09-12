@@ -11,7 +11,7 @@ creation during test setup is a problem in itself.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -30,6 +30,7 @@ from kerbl_iot import (
     KerblConnectionError,
     KerblIOT,
     SmartCoop,
+    SmartCoopLog,
 )
 from tests.kerbl_fakes import SMART_COOP_ID, FakeApi, smart_coop_payload
 
@@ -172,3 +173,59 @@ async def test_command_unknown_smart_coop_raises(
 
     with pytest.raises(HomeAssistantError):
         await coordinator.async_turn_on_light("does-not-exist")
+
+
+async def test_get_active_smart_coop_logs_filters_out_inactive_entries(
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+) -> None:
+    """Only entries with active=True come back, matching the log's own field."""
+    api = FakeApi([smart_coop_payload()])
+    coordinator = await make_coordinator(api)
+    api.logs[SMART_COOP_ID] = [
+        SmartCoopLog(
+            time="12:00",
+            date="2024.01.01",
+            active=True,
+            error_code=42,
+            error_key="err.some_error",
+            level="error",
+            occurred_at=None,
+            received_at=datetime.now(UTC),
+        ),
+        SmartCoopLog(
+            time="09:00",
+            date="2024.01.01",
+            active=False,
+            error_code=17,
+            error_key="err.old_error",
+            level="error",
+            occurred_at=None,
+            received_at=datetime.now(UTC),
+        ),
+    ]
+    await coordinator.kerbl.refresh_smart_coop_logs(SMART_COOP_ID)
+
+    active_logs = coordinator.get_active_smart_coop_logs(SMART_COOP_ID)
+
+    assert [log.error_code for log in active_logs] == [42]
+
+
+async def test_log_refresh_notifies_listeners(
+    make_coordinator: Callable[[FakeApi], Awaitable[KerblIotDataUpdateCoordinator]],
+) -> None:
+    """A background log refresh re-notifies listeners, not just data pushes.
+
+    Regression test for the has-errors binary sensor: it reads
+    ``get_active_smart_coop_logs`` live rather than from coordinator.data,
+    so without this wiring (`_handle_log_refresh` registered via
+    ``register_smart_coop_log_callback``) a newly active error would never
+    reach a re-render.
+    """
+    api = FakeApi([smart_coop_payload()])
+    coordinator = await make_coordinator(api)
+    listener = MagicMock()
+    coordinator.async_add_listener(listener)
+
+    await coordinator.kerbl.refresh_smart_coop_logs(SMART_COOP_ID)
+
+    listener.assert_called_once()

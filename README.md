@@ -10,9 +10,10 @@ Custom [Home Assistant](https://www.home-assistant.io/) integration for
 
 > **Status.** ✅ Step 1: project skeleton, domain, `manifest.json`,
 > packaging, CI, test harness. ✅ Step 2: config flow (e-mail/password login,
-> token-only storage) and the reauthentication flow. ⬜ Coordinator, entity
-> platforms, devices/sub-devices – added in the next build-out steps. This
-> README is kept as a living document and updated as each step lands.
+> token-only storage) and the reauthentication flow. ✅ Step 3: push-driven
+> `DataUpdateCoordinator`. ✅ Step 4: entity platforms, with the SmartCoop
+> modelled as a root device plus linked sub-devices. ✅ Step 5: diagnostics.
+> This README is kept as a living document and updated as each step lands.
 
 ## Account setup and reauthentication
 
@@ -55,24 +56,35 @@ e-mail, are rejected).
   first commit – even though this integration is not (yet) intended for
   Home Assistant Core.
 
-## Planned entity model (SmartCoop)
+## Entity model (SmartCoop)
 
-| Sub-device      | Entity                                   | Platform         |
-| ---------------- | ----------------------------------------- | ---------------- |
-| SmartCoop (root) | Air temperature                           | `sensor`         |
-| SmartCoop (root) | Errors active (+ active errors attribute) | `binary_sensor`  |
-| SmartCoop (root) | Firmware version                          | device property  |
-| Door              | Door                                      | `cover`          |
-| Light             | Light (on/off)                            | `light`          |
-| Light             | Dim value (0–100)                         | `sensor`         |
-| Feeder            | Trigger feeding                           | `button`         |
-| Feeder            | Feeding active                            | `binary_sensor`  |
-| Water heater      | Water temperature                         | `sensor`         |
-| Water heater      | Water sensor state                        | `binary_sensor`  |
-| Brightness        | Brightness (0–100)                        | `sensor`         |
+Every SmartCoop is one Home Assistant device (the root device, carrying its
+firmware version as a device property, not a separate entity) plus five
+linked sub-devices – one per physical component – each shown as its own
+device page via `via_device`.
 
-This table reflects the current plan and will be extended (coordinator,
-entity platforms, devices/sub-devices) as later steps are implemented.
+| Device            | Entity                                    | Platform        |
+| ----------------- | ------------------------------------------ | --------------- |
+| SmartCoop (root)  | Air temperature                           | `sensor`        |
+| SmartCoop (root)  | Errors (+ active errors attribute)        | `binary_sensor` |
+| SmartCoop (root)  | Online                                     | `binary_sensor` |
+| SmartCoop (root)  | Acknowledge errors                        | `button`        |
+| Door              | Door                                      | `cover`         |
+| Door              | Door state                                | `sensor`        |
+| Door              | Door closes in                            | `sensor`        |
+| Light             | Light (on/off)                            | `light`         |
+| Light             | Dim value (0–100)                         | `sensor`        |
+| Feeder            | Trigger feeding                           | `button`        |
+| Feeder            | Feeding in progress                       | `binary_sensor` |
+| Feeder            | Feed empty                                | `binary_sensor` |
+| Feeder            | Feeding locked                            | `binary_sensor` |
+| Water heater      | Water temperature                         | `sensor`        |
+| Water heater      | Water sensor                              | `binary_sensor` |
+| Brightness        | Brightness (0–100)                        | `sensor`        |
+| Brightness        | External brightness sensor connected      | `binary_sensor` |
+
+A SmartCoop that reports no door (`hasNoDoor`) gets no Door device or door
+entities at all.
 
 ## Installation (HACS custom repository)
 
@@ -82,9 +94,6 @@ entity platforms, devices/sub-devices) as later steps are implemented.
 3. Install **Kerbl IoT**, restart Home Assistant, then add the integration
    via **Settings → Devices & services → Add integration** and sign in with
    your Kerbl IoT e-mail and password.
-
-_(No entities are created yet – the coordinator and platforms land in the
-next build-out step; see Status above.)_
 
 ## Development
 

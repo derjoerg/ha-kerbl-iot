@@ -28,13 +28,14 @@
       "reauth_successful": "Re-authentication was successful."
     }
   },
+  "device": {
+    "door": { "name": "Door" },
+    "light": { "name": "Light" },
+    "feeder": { "name": "Feeder" },
+    "water_heater": { "name": "Water heater" },
+    "brightness": { "name": "Brightness sensor" }
+  },
   "entity": {
-    "light": {
-      "light": { "name": "Light" }
-    },
-    "cover": {
-      "door": { "name": "Door" }
-    },
     "button": {
       "feed_now": { "name": "Feed now" },
       "acknowledge_errors": { "name": "Acknowledge errors" }
@@ -43,9 +44,8 @@
       "air_temperature": { "name": "Temperature" },
       "water_temperature": { "name": "Water temperature" },
       "brightness": { "name": "Brightness" },
-      "firmware_version": { "name": "Firmware version" },
+      "dim_value": { "name": "Dim value" },
       "door_closes_in": { "name": "Door closes in" },
-      "current_error": { "name": "Current error" },
       "door_state": {
         "name": "Door state",
         "state": {
@@ -64,6 +64,7 @@
     },
     "binary_sensor": {
       "online": { "name": "Online" },
+      "has_errors": { "name": "Errors" },
       "feeding_in_progress": { "name": "Feeding in progress" },
       "feed_empty": { "name": "Feed empty" },
       "feeding_locked": { "name": "Feeding locked" },

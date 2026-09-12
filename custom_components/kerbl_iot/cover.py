@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from kerbl_iot import DoorState
 
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import KerblIotEntity
+from .entity import SUB_DEVICE_DOOR, KerblIotEntity
 
 # (is_closed, is_opening, is_closing) for the door states that map onto a
 # clear cover position. States outside this map (SIMULATE, TOGGLE_MANUAL,
@@ -56,8 +56,14 @@ class KerblIotDoorCover(KerblIotEntity, CoverEntity):
     def __init__(
         self, coordinator: KerblIotDataUpdateCoordinator, smart_coop_id: str
     ) -> None:
-        """Set up the door cover entity for one SmartCoop."""
-        super().__init__(coordinator, smart_coop_id, "door")
+        """Set up the door cover entity on one SmartCoop's Door sub-device.
+
+        ``translation_key=None`` makes this the nameless primary entity of
+        the Door device (see ``KerblIotEntity``): Home Assistant shows the
+        device's own translated name ("Door"/"Tür") as this entity's name
+        instead of a redundant "Door Door".
+        """
+        super().__init__(coordinator, smart_coop_id, None, sub_device=SUB_DEVICE_DOOR)
 
     @property
     def is_closed(self) -> bool | None:

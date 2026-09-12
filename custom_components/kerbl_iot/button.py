@@ -9,7 +9,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import KerblIotEntity
+from .entity import SUB_DEVICE_FEEDER, KerblIotEntity
 
 
 async def async_setup_entry(
@@ -32,8 +32,10 @@ class KerblIotFeedButton(KerblIotEntity, ButtonEntity):
     def __init__(
         self, coordinator: KerblIotDataUpdateCoordinator, smart_coop_id: str
     ) -> None:
-        """Set up the feed button for one SmartCoop."""
-        super().__init__(coordinator, smart_coop_id, "feed_now")
+        """Set up the feed button on one SmartCoop's Feeder sub-device."""
+        super().__init__(
+            coordinator, smart_coop_id, "feed_now", sub_device=SUB_DEVICE_FEEDER
+        )
 
     async def async_press(self) -> None:
         """Trigger one manual feeding."""
@@ -60,8 +62,7 @@ class KerblIotAcknowledgeErrorsButton(KerblIotEntity, ButtonEntity):
         """
         active_codes = {
             log.error_code
-            for log in self.coordinator.kerbl.get_smart_coop_logs(self._smart_coop_id)
-            if log.active
+            for log in self.coordinator.get_active_smart_coop_logs(self._smart_coop_id)
         }
         if not active_codes:
             raise HomeAssistantError("No active Kerbl IoT errors to acknowledge.")

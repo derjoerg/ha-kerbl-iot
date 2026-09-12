@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import KerblIotEntity
+from .entity import SUB_DEVICE_LIGHT, KerblIotEntity
 
 
 async def async_setup_entry(
@@ -44,8 +44,14 @@ class KerblIotLight(KerblIotEntity, LightEntity):
     def __init__(
         self, coordinator: KerblIotDataUpdateCoordinator, smart_coop_id: str
     ) -> None:
-        """Set up the light entity for one SmartCoop."""
-        super().__init__(coordinator, smart_coop_id, "light")
+        """Set up the on/off light entity on one SmartCoop's Light sub-device.
+
+        ``translation_key=None`` makes this the nameless primary entity of
+        the Light device (see ``KerblIotEntity``): Home Assistant shows the
+        device's own translated name ("Light"/"Licht") as this entity's
+        name instead of a redundant "Light Light".
+        """
+        super().__init__(coordinator, smart_coop_id, None, sub_device=SUB_DEVICE_LIGHT)
 
     @property
     def is_on(self) -> bool | None:

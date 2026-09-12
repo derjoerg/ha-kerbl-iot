@@ -11,7 +11,12 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import EntityCategory, UnitOfTemperature, UnitOfTime
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
@@ -19,7 +24,13 @@ from homeassistant.helpers.typing import StateType
 from kerbl_iot import DoorState, SmartCoop
 
 from .coordinator import KerblIotConfigEntry, KerblIotDataUpdateCoordinator
-from .entity import KerblIotEntity
+from .entity import (
+    SUB_DEVICE_BRIGHTNESS,
+    SUB_DEVICE_DOOR,
+    SUB_DEVICE_LIGHT,
+    SUB_DEVICE_WATER_HEATER,
+    KerblIotEntity,
+)
 
 _DOOR_STATE_OPTIONS = [state.name.lower() for state in DoorState]
 # These two only make sense for a SmartCoop that actually reports a door.
@@ -31,6 +42,9 @@ class KerblIotSensorEntityDescription(SensorEntityDescription):
     """Describe a Kerbl IoT sensor derived from a SmartCoop snapshot."""
 
     value_fn: Callable[[SmartCoop], StateType]
+    # Which of the SmartCoop's sub-devices (see entity.py) this sensor
+    # belongs to; None keeps it on the SmartCoop root device.
+    sub_device: str | None = None
 
 
 def _door_state_option(smart_coop: SmartCoop) -> StateType:
@@ -50,6 +64,7 @@ SENSOR_DESCRIPTIONS: tuple[KerblIotSensorEntityDescription, ...] = (
     KerblIotSensorEntityDescription(
         key="water_temperature",
         translation_key="water_temperature",
+        sub_device=SUB_DEVICE_WATER_HEATER,
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
@@ -58,21 +73,24 @@ SENSOR_DESCRIPTIONS: tuple[KerblIotSensorEntityDescription, ...] = (
     KerblIotSensorEntityDescription(
         key="brightness",
         translation_key="brightness",
+        sub_device=SUB_DEVICE_BRIGHTNESS,
         # Kerbl doesn't document a unit for the reported value, so this is
         # left as a plain numeric measurement rather than guessing lux/%.
         state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda smart_coop: smart_coop.brightness.current_brightness,
     ),
     KerblIotSensorEntityDescription(
-        key="firmware_version",
-        translation_key="firmware_version",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda smart_coop: smart_coop.firmware_version,
+        key="dim_value",
+        translation_key="dim_value",
+        sub_device=SUB_DEVICE_LIGHT,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda smart_coop: smart_coop.light.current_dim_value,
     ),
     KerblIotSensorEntityDescription(
         key="door_closes_in",
         translation_key="door_closes_in",
+        sub_device=SUB_DEVICE_DOOR,
         native_unit_of_measurement=UnitOfTime.MINUTES,
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda smart_coop: smart_coop.door.closes_in_minutes,
@@ -80,16 +98,11 @@ SENSOR_DESCRIPTIONS: tuple[KerblIotSensorEntityDescription, ...] = (
     KerblIotSensorEntityDescription(
         key="door_state",
         translation_key="door_state",
+        sub_device=SUB_DEVICE_DOOR,
         device_class=SensorDeviceClass.ENUM,
         options=_DOOR_STATE_OPTIONS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_door_state_option,
-    ),
-    KerblIotSensorEntityDescription(
-        key="current_error",
-        translation_key="current_error",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda smart_coop: smart_coop.current_error_reason,
     ),
 )
 
@@ -123,7 +136,12 @@ class KerblIotSensor(KerblIotEntity, SensorEntity):
         description: KerblIotSensorEntityDescription,
     ) -> None:
         """Set up one sensor for one SmartCoop."""
-        super().__init__(coordinator, smart_coop_id, description.key)
+        super().__init__(
+            coordinator,
+            smart_coop_id,
+            description.key,
+            sub_device=description.sub_device,
+        )
         self.entity_description = description
 
     @property

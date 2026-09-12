@@ -26,6 +26,7 @@ from kerbl_iot import (
     KerblProtocolError,
     KerblStateError,
     SmartCoop,
+    SmartCoopLog,
 )
 
 from .const import DOMAIN
@@ -67,6 +68,7 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
         self.kerbl = kerbl
         kerbl.register_smart_coop_update_callback(self._handle_push_update)
         kerbl.register_availability_callback(self._handle_availability_change)
+        kerbl.register_smart_coop_log_callback(self._handle_log_refresh)
 
     async def _async_setup(self) -> None:
         """Validate the stored session and open the Socket.IO push channel.
@@ -132,6 +134,23 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
         """Re-notify listeners so per-device availability (see below) updates."""
         self.async_update_listeners()
 
+    async def _handle_log_refresh(
+        self,
+        smart_coop: SmartCoop,  # noqa: ARG002 - entities read logs via get_active_smart_coop_logs, not this callback
+        logs: list[SmartCoopLog],  # noqa: ARG002 - see above
+    ) -> None:
+        """Re-notify listeners so the has-errors binary sensor picks up new logs.
+
+        ``KerblIOT`` refreshes its authoritative log cache in the
+        background -- debounced, shortly after a SmartCoop update changes
+        its error fields (see ``KerblIOT._schedule_log_refresh``) -- on a
+        callback list of its own, separate from the SmartCoop push-update
+        callbacks ``_handle_push_update`` above already listens to. Without
+        also registering here, a newly active error would sit in
+        ``self.kerbl``'s cache without ever reaching listening entities.
+        """
+        self.async_update_listeners()
+
     def is_smart_coop_available(self, smart_coop_id: str) -> bool:
         """Return whether a given SmartCoop is currently reachable.
 
@@ -141,6 +160,17 @@ class KerblIotDataUpdateCoordinator(DataUpdateCoordinator[dict[str, SmartCoop]])
         account's REST/Socket.IO connection as a whole) stay fine.
         """
         return self.kerbl.is_smart_coop_available(smart_coop_id)
+
+    def get_active_smart_coop_logs(self, smart_coop_id: str) -> list[SmartCoopLog]:
+        """Return a SmartCoop's currently active (unacknowledged) log entries.
+
+        Shared by the has-errors binary sensor (state + the active errors
+        it reports as an attribute) and the acknowledge-errors button
+        (which codes to send), so both agree on what "active" means.
+        """
+        return [
+            log for log in self.kerbl.get_smart_coop_logs(smart_coop_id) if log.active
+        ]
 
     async def async_turn_on_light(self, smart_coop_id: str) -> None:
         """Turn a SmartCoop's light on and push the confirmed state."""

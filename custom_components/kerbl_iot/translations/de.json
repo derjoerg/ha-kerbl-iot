@@ -28,13 +28,14 @@
       "reauth_successful": "Die erneute Authentifizierung war erfolgreich."
     }
   },
+  "device": {
+    "door": { "name": "Tür" },
+    "light": { "name": "Licht" },
+    "feeder": { "name": "Futterautomat" },
+    "water_heater": { "name": "Wasserheizung" },
+    "brightness": { "name": "Helligkeitssensor" }
+  },
   "entity": {
-    "light": {
-      "light": { "name": "Licht" }
-    },
-    "cover": {
-      "door": { "name": "Tür" }
-    },
     "button": {
       "feed_now": { "name": "Jetzt füttern" },
       "acknowledge_errors": { "name": "Fehler quittieren" }
@@ -43,9 +44,8 @@
       "air_temperature": { "name": "Temperatur" },
       "water_temperature": { "name": "Wassertemperatur" },
       "brightness": { "name": "Helligkeit" },
-      "firmware_version": { "name": "Firmware-Version" },
+      "dim_value": { "name": "Dimmwert" },
       "door_closes_in": { "name": "Tür schließt in" },
-      "current_error": { "name": "Aktueller Fehler" },
       "door_state": {
         "name": "Türstatus",
         "state": {
@@ -64,6 +64,7 @@
     },
     "binary_sensor": {
       "online": { "name": "Online" },
+      "has_errors": { "name": "Fehler" },
       "feeding_in_progress": { "name": "Fütterung läuft" },
       "feed_empty": { "name": "Futter leer" },
       "feeding_locked": { "name": "Fütterung gesperrt" },
