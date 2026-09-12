@@ -1,8 +1,31 @@
 {
   "title": "Kerbl IoT",
   "config": {
+    "step": {
+      "user": {
+        "title": "Kerbl IoT-Konto verbinden",
+        "description": "Melde dich mit deiner Kerbl IoT E-Mail-Adresse und deinem Passwort an. Gespeichert werden anschließend ausschließlich die daraus resultierenden Access- und Refresh-Tokens – dein Passwort selbst wird nicht gespeichert.",
+        "data": {
+          "email": "E-Mail",
+          "password": "Passwort"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Kerbl IoT erneut authentifizieren",
+        "description": "Die gespeicherte Sitzung für {email} ist nicht mehr gültig. Gib dein Passwort erneut ein, um sie zu erneuern.",
+        "data": {
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-Mail-Adresse oder Passwort ungültig.",
+      "cannot_connect": "Verbindung zum Kerbl IoT-Dienst konnte nicht hergestellt werden.",
+      "unknown": "Unerwarteter Fehler."
+    },
     "abort": {
-      "not_implemented": "Die Kontoanmeldung wird in einem späteren Entwicklungsschritt dieser Integration ergänzt."
+      "already_configured": "Dieses Kerbl IoT-Konto ist bereits eingerichtet.",
+      "reauth_successful": "Die erneute Authentifizierung war erfolgreich."
     }
   }
 }

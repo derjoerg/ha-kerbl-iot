@@ -39,12 +39,15 @@ ignore = [
   "D213",   # conflicts with D212 (multi-line-summary-first-line)
   "ANN401", # Any is sometimes unavoidable at HA framework boundaries
   "PLR0913", # Home Assistant setup/entity signatures are legitimately wide
+  "UP040",  # keep `TypeAlias` (not the PEP 695 `type` statement) so the whole
+            # toolchain -- including mypy builds still on Python < 3.12 -- can
+            # actually parse the file; both spellings are equivalent at runtime.
 ]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests may use asserts, access private members, skip full annotations/docstrings,
 # and request fixtures purely for their side effect (unused-looking arguments).
-"tests/*" = ["S101", "SLF001", "ANN", "D", "PLR2004", "ARG"]
+"tests/*" = ["S101", "S105", "S106", "SLF001", "ANN", "D", "PLR2004", "ARG"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

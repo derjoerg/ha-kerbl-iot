@@ -8,10 +8,30 @@ Custom [Home Assistant](https://www.home-assistant.io/) integration for
 [Kerbl IoT](https://www.kerbl-iot.com/) devices, built on top of the
 [`kerbl-iot`](https://pypi.org/project/kerbl-iot/) Python client.
 
-> **Status: Grundgerüst.** This repository currently only contains the
-> project skeleton (domain, `manifest.json`, packaging, CI, test harness).
-> No entities exist yet – they're added in the next build-out steps. This
+> **Status.** ✅ Step 1: project skeleton, domain, `manifest.json`,
+> packaging, CI, test harness. ✅ Step 2: config flow (e-mail/password login,
+> token-only storage) and the reauthentication flow. ⬜ Coordinator, entity
+> platforms, devices/sub-devices – added in the next build-out steps. This
 > README is kept as a living document and updated as each step lands.
+
+## Account setup and reauthentication
+
+Adding the integration asks once for your Kerbl IoT e-mail and password. On
+success, only the resulting **access and refresh tokens** are stored in the
+config entry – the password itself is discarded immediately and never
+written to storage. On every restart, the stored tokens are restored onto
+the API client and validated with one authenticated call.
+
+If the stored session can no longer be used (`KerblAuthenticationError`,
+e.g. the refresh token itself expired or was revoked), Home Assistant
+automatically starts a **reauthentication flow**: it asks for the password
+again for the same account and replaces the stored tokens with a fresh
+pair. A transient connection problem instead schedules a normal setup
+retry and does not trigger reauth.
+
+Each Kerbl account is its own config entry, so multiple accounts can be
+added side by side (duplicate accounts, matched case-insensitively by
+e-mail, are rejected).
 
 ## Design goals
 
@@ -51,8 +71,8 @@ Custom [Home Assistant](https://www.home-assistant.io/) integration for
 | Water heater      | Water sensor state                        | `binary_sensor`  |
 | Brightness        | Brightness (0–100)                        | `sensor`         |
 
-This table reflects the current plan and will be extended (config flow,
-reauth, coordinator, translations) as later steps are implemented.
+This table reflects the current plan and will be extended (coordinator,
+entity platforms, devices/sub-devices) as later steps are implemented.
 
 ## Installation (HACS custom repository)
 
@@ -60,9 +80,11 @@ reauth, coordinator, translations) as later steps are implemented.
 2. Add `https://github.com/derjoerg/ha-kerbl-iot` with category
    **Integration**.
 3. Install **Kerbl IoT**, restart Home Assistant, then add the integration
-   via **Settings → Devices & services → Add integration**.
+   via **Settings → Devices & services → Add integration** and sign in with
+   your Kerbl IoT e-mail and password.
 
-_(Config flow is not implemented yet – see Status above.)_
+_(No entities are created yet – the coordinator and platforms land in the
+next build-out step; see Status above.)_
 
 ## Development
 

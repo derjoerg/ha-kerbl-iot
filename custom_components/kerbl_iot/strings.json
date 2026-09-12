@@ -1,8 +1,31 @@
 {
   "title": "Kerbl IoT",
   "config": {
+    "step": {
+      "user": {
+        "title": "Connect your Kerbl IoT account",
+        "description": "Sign in with your Kerbl IoT e-mail and password. Only the resulting access and refresh tokens are stored afterwards – your password itself is never saved.",
+        "data": {
+          "email": "E-mail",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Kerbl IoT",
+        "description": "The stored session for {email} is no longer valid. Enter your password again to refresh it.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid e-mail or password.",
+      "cannot_connect": "Could not connect to the Kerbl IoT service.",
+      "unknown": "Unexpected error."
+    },
     "abort": {
-      "not_implemented": "Account login will be added in a later development step of this integration."
+      "already_configured": "This Kerbl IoT account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
     }
   }
 }
