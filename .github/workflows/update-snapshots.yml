@@ -1,0 +1,33 @@
+name: Update snapshots
+
+# Manual, on-demand helper: regenerates syrupy's snapshot files using the
+# same Linux + Python 3.13 environment the CI workflow runs in, and uploads
+# them as a downloadable artifact. Useful whenever a local machine (e.g.
+# Windows) can't build Home Assistant's native dependencies, or after a
+# deliberate, reviewed change to expected snapshot output.
+on:
+  workflow_dispatch:
+
+jobs:
+  update-snapshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements_test.txt
+
+      - name: Update snapshots
+        run: pytest --snapshot-update
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snapshots
+          path: tests/__snapshots__/
